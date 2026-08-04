@@ -24,9 +24,11 @@ import {
   validateTap,
 } from "./bets.js";
 import {
+  afterHoursTick,
   connectFeed,
   createFeedState,
   isFeedStale,
+  isUsRthOpen,
   simTick,
   stopFeed,
   updateEwmaVol,
@@ -40,8 +42,8 @@ import { verifyUsdtDeposit } from "./solana.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 loadEnv({ path: resolve(__dirname, "../../../.env") });
 
-const PORT = Number(process.env.PORT ?? 8787);
-const HOST = process.env.HOST ?? "0.0.0.0";
+const PORT = Number(process.env.PORT) || 8080;
+const HOST = "0.0.0.0";
 
 interface Session {
   asset: Asset;
@@ -261,21 +263,29 @@ function tick(walletId: string): void {
   state.now += dt;
   state.prev = state.price;
 
-  if (state.feed.lastPrice && (state.feed.mode === "live" || state.liveAdopted)) {
-    const p = state.feed.lastPrice;
+  const liveP = state.feed.lastPrice;
+  const rth = isUsRthOpen();
+  if (liveP && (state.feed.mode === "live" || state.liveAdopted)) {
     if (!state.liveAdopted) {
-      adoptPrice(p, { force: true });
+      adoptPrice(liveP, { force: true });
       state.liveAdopted = true;
-    } else if (isFeedStale(state.feed)) {
-      // Hold last live print — never inject sim jitter into a live session
+    } else if (rth && !isFeedStale(state.feed)) {
+      // Regular hours + fresh Finnhub prints — pin to exchange
+      state.price = liveP;
       state.feed.mode = "live";
+      state.feed.src = "FINNHUB";
     } else {
-      // Live updates never wipe hist — only snap price (rebaseline reserved for first adopt)
-      state.price = p;
+      // After hours / weekend / stale feed: soft sim around last close so the tape moves
+      // (equities don't print 24/7 like the old BTC feed — without this the line freezes)
+      state.price = afterHoursTick(state.feed, state.asset, state.price, liveP, dt);
+      state.feed.mode = "sim";
+      state.feed.src = rth ? "STALE · SIM" : "AFTER HOURS";
     }
   } else {
     // Pre-live only: quiet sim so the grid can price before Finnhub seeds
     state.price = simTick(state.feed, state.asset, state.price, dt);
+    state.feed.mode = "sim";
+    state.feed.src = "SIM";
   }
 
   // Append hist when price moved, or every 500ms so the tape still scrolls
@@ -297,7 +307,8 @@ function tick(walletId: string): void {
   state.rowPts = updateRowPts(state.asset, state.sigma, state.rowPts);
   state.camY += (state.price - state.camY) * 0.03;
 
-  risk.onFeedStall(state.liveAdopted && isFeedStale(state.feed));
+  // Only trip stall kill-switch during RTH — after-hours sim is expected
+  risk.onFeedStall(state.liveAdopted && rth && isFeedStale(state.feed));
   settleBets(walletId);
   corridorTick(walletId);
 }
@@ -535,34 +546,39 @@ function handleClient(msg: ClientMessage, session: Session): void {
 }
 
 async function main(): Promise<void> {
-  await ledger.ensureReady();
   const app = Fastify({ logger: true });
+
+  app.get("/health", async (_req, reply) => {
+    return reply.code(200).type("text/plain").send("ok");
+  });
+
+  // Kick off DB init without blocking the HTTP listener (Railway healthcheck)
+  const ledgerReady = ledger.ensureReady().catch((err) => {
+    console.error("[ledger] init failed", err);
+    throw err;
+  });
+
   await app.register(cors, { origin: true });
   await app.register(websocket);
 
-  app.get("/health", async () => ({
-    ok: true,
-    asset: state.asset,
-    price: state.price,
-    feed: state.feed.mode,
-    killSwitch: risk.isPaused(),
-    openBets: state.bets.filter((b) => b.state === "open").length,
-    houseDelta: aggregateOpenDelta(state.bets, state.price),
-  }));
-
-  app.get("/events", async () => ledger.listEvents(50));
+  app.get("/events", async () => {
+    await ledgerReady;
+    return ledger.listEvents(50);
+  });
 
   app.register(async (f) => {
     f.get("/ws", { websocket: true }, (socket) => {
       const session: Session = { asset: "SPY", walletId: "default", ws: socket };
       sessions.add(session);
-      socket.send(JSON.stringify({ type: "vault", vault: vaultView(session.walletId) }));
-      sendQuote();
+      void ledgerReady.then(() => {
+        socket.send(JSON.stringify({ type: "vault", vault: vaultView(session.walletId) }));
+        sendQuote();
+      });
 
       socket.on("message", (raw) => {
         try {
           const msg = JSON.parse(String(raw)) as ClientMessage;
-          handleClient(msg, session);
+          void ledgerReady.then(() => handleClient(msg, session));
         } catch {
           socket.send(JSON.stringify({ type: "error", message: "INVALID MESSAGE" }));
         }
@@ -584,7 +600,10 @@ async function main(): Promise<void> {
   setInterval(() => reprice(), CFG.repriceMs);
 
   await app.listen({ port: PORT, host: HOST });
-  console.log(`SNAPLINE engine on ws://${HOST}:${PORT}/ws`);
+  console.log(`SNAPLINE engine listening on http://${HOST}:${PORT} (health /health)`);
+
+  await ledgerReady;
+  console.log("[ledger] ready");
 }
 
 main().catch((err) => {

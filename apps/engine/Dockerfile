@@ -21,6 +21,7 @@ RUN pnpm --filter @snapline/shared build \
 WORKDIR /app/apps/engine
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
-EXPOSE 8787
+EXPOSE 8080
 
-CMD ["node", "dist/index.js"]
+# Absolute path so Railway startCommand / cwd cannot miss dist/
+CMD ["node", "/app/apps/engine/dist/index.js"]
