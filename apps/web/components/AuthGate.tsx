@@ -6,20 +6,21 @@ import { useSnaplineWallet } from "@/lib/wallet";
 import { LoginScreen } from "@/components/LoginScreen";
 import { Game } from "@/components/Game";
 
-const PRIVY_ON = !!process.env.NEXT_PUBLIC_PRIVY_APP_ID;
 const SIGNER_ID = process.env.NEXT_PUBLIC_PRIVY_SIGNER_ID;
 
 /**
- * Gates the game behind Privy when configured. Provisions Solana embedded wallet on login
- * and optionally attaches a session signer so on-chain actions can skip wallet prompts.
+ * Gates the game behind Privy. Provisions Solana embedded wallet on login
+ * and optionally attaches a session signer (set NEXT_PUBLIC_PRIVY_SIGNER_ID
+ * from your Privy key quorum) so on-chain actions skip wallet prompts.
+ * Game taps are WS-only and never hit the wallet.
  */
 export function AuthGate() {
-  const { privyConfigured, ready, authenticated, address, user } = useSnaplineWallet();
+  const { ready, authenticated, address, user } = useSnaplineWallet();
   const { addSessionSigners } = useSessionSigners();
   const signedRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!PRIVY_ON || !authenticated || !address || !SIGNER_ID) return;
+    if (!authenticated || !address || !SIGNER_ID) return;
     if (signedRef.current === address) return;
     signedRef.current = address;
     void addSessionSigners({
@@ -30,10 +31,6 @@ export function AuthGate() {
       signedRef.current = null;
     });
   }, [authenticated, address, addSessionSigners]);
-
-  if (!privyConfigured) {
-    return <Game />;
-  }
 
   if (!ready) {
     return (
