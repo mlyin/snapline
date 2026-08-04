@@ -12,7 +12,7 @@ COPY apps/engine/package.json ./apps/engine/
 RUN pnpm install --frozen-lockfile=false --filter @snapline/engine...
 
 # Bump CACHEBUST whenever health/listen changes so Railway cannot reuse a stale engine layer
-ARG CACHEBUST=health-2026-08-04-c
+ARG CACHEBUST=health-2026-08-04-e-no-db-throw
 RUN echo "cachebust=$CACHEBUST"
 
 COPY packages/shared ./packages/shared

@@ -601,6 +601,7 @@ async function main(): Promise<void> {
   console.log(
     JSON.stringify({
       msg: "snapline-listen",
+      version: "df79485+",
       host: HOST,
       port: PORT,
       hasDatabaseUrl: Boolean(process.env.DATABASE_URL),
