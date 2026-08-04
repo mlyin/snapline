@@ -1,0 +1,12 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "builder": "NIXPACKS",
+    "buildCommand": "pnpm install --frozen-lockfile=false && pnpm --filter @snapline/shared build && pnpm --filter @snapline/engine build"
+  },
+  "deploy": {
+    "startCommand": "pnpm --filter @snapline/engine start",
+    "healthcheckPath": "/health",
+    "restartPolicyType": "ON_FAILURE"
+  }
+}

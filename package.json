@@ -1,0 +1,22 @@
+{
+  "name": "snapline",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n engine,web -c green,cyan \"pnpm --filter @snapline/engine dev\" \"pnpm --filter @snapline/web dev\"",
+    "dev:engine": "pnpm --filter @snapline/engine dev",
+    "dev:web": "pnpm --filter @snapline/web dev",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build": "pnpm --filter @snapline/shared build && pnpm --filter @snapline/engine build && pnpm --filter @snapline/web build",
+    "typecheck": "tsc -b"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.5"
+  }
+}

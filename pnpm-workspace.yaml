@@ -1,0 +1,11 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+allowBuilds:
+  '@reown/appkit': set this to true or false
+  better-sqlite3: true
+  bigint-buffer: set this to true or false
+  bufferutil: set this to true or false
+  esbuild: true
+  sharp: true
+  utf-8-validate: set this to true or false

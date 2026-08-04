@@ -1,0 +1,6 @@
+{
+  "buildCommand": "cd ../.. && pnpm install --frozen-lockfile=false && pnpm --filter @snapline/shared build && pnpm --filter @snapline/web build",
+  "installCommand": "echo 'install handled in buildCommand'",
+  "framework": "nextjs",
+  "rewrites": []
+}

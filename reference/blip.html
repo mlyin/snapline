@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BLIP — tap the tape</title>
+<style>
+  :root{
+    --bg:#070a08; --bg2:#0b100c; --panel:#10160f; --panelBr:#1f2c1c;
+    --ink:#e8f2e4; --dim:#7d9179; --faint:#48584a;
+    --lime:#b6ff2e; --lime2:#d4ff7a; --mint:#54e6a8; --coral:#ff5d5d;
+    --ice:#8fd8ff; --gold:#ffd166;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%; overflow:hidden; background:var(--bg);
+    font-family:ui-monospace,'SF Mono','Cascadia Mono',Menlo,Consolas,monospace;
+    color:var(--ink); user-select:none; -webkit-user-select:none;}
+  #cv{position:absolute; inset:0; display:block; cursor:crosshair;}
+  .hud{position:absolute; z-index:5;}
+  #top{top:0;left:0;right:0; display:flex; align-items:center; gap:14px; padding:12px 18px;
+    background:linear-gradient(180deg,rgba(7,10,8,.95),rgba(7,10,8,0)); pointer-events:none;}
+  #logo{font-size:17px; font-weight:800; letter-spacing:.08em; color:#fff;}
+  #logo .dot{color:var(--lime);}
+  #feedbadge{font-size:9px; padding:3px 8px; border-radius:99px; border:1px solid var(--panelBr);
+    color:var(--dim); letter-spacing:.12em;}
+  #feedbadge.live{color:#07110a; background:var(--lime); border-color:var(--lime); font-weight:800;}
+  .tabs{display:flex; gap:6px; pointer-events:auto;}
+  .tab{cursor:pointer; padding:6px 13px; border-radius:99px; border:1px solid var(--panelBr);
+    background:transparent; color:var(--dim); font-family:inherit; font-size:12px; font-weight:700;}
+  .tab.on{background:#fff; color:#0a0d0a; border-color:#fff;}
+  #px{font-size:21px; font-weight:800; color:#fff; font-variant-numeric:tabular-nums;}
+  #px.up{color:var(--lime);} #px.dn{color:var(--coral);}
+  .st{display:flex; flex-direction:column; font-variant-numeric:tabular-nums;}
+  .st .v{font-size:13.5px; font-weight:700; color:var(--ink);}
+  .st .k{font-size:8.5px; color:var(--faint); letter-spacing:.16em; text-transform:uppercase;}
+  #vaultbtn{margin-left:auto; pointer-events:auto; cursor:pointer; padding:8px 14px; border-radius:10px;
+    border:1px solid var(--panelBr); background:var(--panel); color:var(--ink); font-family:inherit;
+    font-size:11.5px; font-weight:700;}
+  #vaultbtn b{color:var(--lime);}
+  #bottom{left:0; right:0; bottom:0; display:flex; align-items:center; gap:10px; padding:12px 18px;
+    background:linear-gradient(0deg,rgba(7,10,8,.96),rgba(7,10,8,0)); pointer-events:none;}
+  .chip{pointer-events:auto; cursor:pointer; min-width:52px; text-align:center; padding:9px 12px;
+    border-radius:12px; border:1px solid var(--panelBr); background:var(--panel); color:var(--dim);
+    font-family:inherit; font-size:12px; font-weight:800;}
+  .chip.on{background:var(--lime); color:#0a0f06; border-color:var(--lime);}
+  .mbtn{pointer-events:auto; cursor:pointer; padding:9px 15px; border-radius:12px;
+    border:1px solid var(--panelBr); background:var(--panel); color:var(--dim); font-family:inherit;
+    font-size:11.5px; font-weight:800; letter-spacing:.08em;}
+  .mbtn.on{background:#fff; color:#0a0d0a; border-color:#fff;}
+  .mbtn.fair{margin-left:auto;}
+  #cashout{position:absolute; z-index:9; left:50%; bottom:110px; transform:translateX(-50%);
+    display:none; pointer-events:auto; cursor:pointer; background:var(--ice); color:#04222f;
+    border:none; border-radius:99px; padding:15px 30px; font-family:inherit; font-weight:800;
+    font-size:16px; box-shadow:0 0 40px rgba(143,216,255,.4);}
+  .panel{position:absolute; z-index:12; top:60px; right:16px; width:322px;
+    background:rgba(13,18,12,.97); border:1px solid var(--panelBr); border-radius:16px;
+    padding:16px 18px; display:none; pointer-events:auto; backdrop-filter:blur(8px);}
+  .panel h3{font-size:11px; letter-spacing:.2em; color:var(--lime); margin-bottom:10px;}
+  .panel .row{display:flex; justify-content:space-between; font-size:11.5px; padding:3.5px 0;
+    font-variant-numeric:tabular-nums;}
+  .panel .row .k{color:var(--dim);} .panel .row .v{color:#fff; font-weight:700;}
+  .panel .x{position:absolute; top:10px; right:13px; cursor:pointer; color:var(--faint);}
+  .panel .note{margin-top:10px; padding-top:10px; border-top:1px dashed var(--panelBr);
+    font-size:10px; line-height:1.6; color:var(--dim);}
+  .panel .note b{color:var(--mint);}
+  .panel .act{display:flex; gap:8px; margin-top:12px;}
+  .panel .act button{flex:1; cursor:pointer; padding:9px 0; border-radius:10px; border:none;
+    font-family:inherit; font-weight:800; font-size:11.5px;}
+  #depBtn{background:var(--lime); color:#0a0f06;}
+  #wdBtn{background:var(--panel); color:var(--ink); border:1px solid var(--panelBr) !important;}
+  #toasts{position:absolute; z-index:7; left:50%; top:64px; transform:translateX(-50%);
+    display:flex; flex-direction:column; gap:6px; align-items:center;}
+  .toast{padding:8px 18px; border-radius:99px; font-weight:800; font-size:13px;
+    animation:tst 2.4s ease forwards; font-variant-numeric:tabular-nums;}
+  .toast.w{background:rgba(182,255,46,.14); color:var(--lime); border:1px solid rgba(182,255,46,.4);}
+  .toast.l{background:rgba(255,93,93,.12); color:var(--coral); border:1px solid rgba(255,93,93,.35);}
+  @keyframes tst{0%{opacity:0; transform:translateY(-8px);}10%{opacity:1;}75%{opacity:1;}
+    100%{opacity:0; transform:translateY(-6px);}}
+  #modal{position:absolute; inset:0; z-index:20; display:none; align-items:center; justify-content:center;
+    background:rgba(3,5,3,.8); pointer-events:auto;}
+  #modal .card{width:min(600px,92vw); background:var(--panel); border:1px solid var(--panelBr);
+    border-radius:18px; padding:26px 30px; line-height:1.65; font-size:12.5px;}
+  #modal h2{font-size:15px; letter-spacing:.1em; color:#fff; margin-bottom:12px;}
+  #modal h2 .dot{color:var(--lime);}
+  #modal p{margin-bottom:10px; color:var(--dim);}
+  #modal p b{color:var(--ink);} #modal p i{color:var(--mint); font-style:normal;}
+  #modal .cta{margin-top:14px; text-align:right;}
+  #modal .cta button{cursor:pointer; background:var(--lime); color:#0a0f06; border:none;
+    border-radius:99px; padding:10px 22px; font-family:inherit; font-weight:800; font-size:12px;}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+
+<div class="hud" id="top">
+  <div id="logo">BLIP<span class="dot">●</span></div>
+  <span id="feedbadge">CONNECTING…</span>
+  <div class="tabs" id="assets">
+    <button class="tab on" data-a="BTC">BTC</button>
+    <button class="tab" data-a="ETH">ETH</button>
+    <button class="tab" data-a="SOL">SOL</button>
+  </div>
+  <span id="px">—</span>
+  <div class="st"><span class="v" id="volv">—</span><span class="k">vol</span></div>
+  <div class="st"><span class="v" id="pnlv">+0.00</span><span class="k">session</span></div>
+  <button id="vaultbtn">VAULT&nbsp; <b id="balv">1,000.00</b> USDT</button>
+</div>
+
+<div class="hud" id="bottom">
+  <button class="chip on" data-s="1">1</button>
+  <button class="chip" data-s="5">5</button>
+  <button class="chip" data-s="25">25</button>
+  <button class="chip" data-s="100">100</button>
+  <span style="width:14px"></span>
+  <button class="mbtn on" id="mGrid">TAP</button>
+  <button class="mbtn" id="mCorr">TUNNEL</button>
+  <button class="mbtn fair" id="fairBtn">FAIR PLAY</button>
+</div>
+
+<button id="cashout">CASH OUT <span id="coMult">1.00x</span></button>
+
+<div class="panel" id="vault">
+  <span class="x" data-x="vault">✕</span>
+  <h3>USDT VAULT · MOCK</h3>
+  <div class="row"><span class="k">Your balance</span><span class="v" id="vBal">1,000.00 USDT</span></div>
+  <div class="row"><span class="k">In play</span><span class="v" id="vPlay">0.00 USDT</span></div>
+  <div class="row"><span class="k">House bankroll</span><span class="v" id="vHouse">250,000 USDT</span></div>
+  <div class="row"><span class="k">House net Δ</span><span class="v" id="vDelta">flat</span></div>
+  <div class="row"><span class="k">Chain</span><span class="v">Solana (mock)</span></div>
+  <div class="note">Production: non-custodial vault program, balances on-chain, bets settle in batches
+  against a <b>signed oracle attestation</b>. Deposits/withdrawals below are simulated.</div>
+  <div class="act"><button id="depBtn">+ DEPOSIT 500</button><button id="wdBtn">WITHDRAW ALL</button></div>
+</div>
+
+<div class="panel" id="receipt">
+  <span class="x" data-x="receipt">✕</span>
+  <h3 id="rcTitle">RECEIPT · RANGE TOUCH</h3>
+  <div id="rcRows"></div>
+  <div class="note" id="rcNote"></div>
+</div>
+
+<div id="toasts"></div>
+
+<div id="modal"><div class="card">
+  <h2>BLIP<span class="dot">●</span> &nbsp;TAP THE TAPE</h2>
+  <p><b>Tap a bubble.</b> If the price line touches it during its window, you win the multiplier.
+  Every bubble is a <i>range one-touch</i> priced live off realized vol — multiplier = (1 − edge) ÷ probability.
+  Edge is fixed and disclosed: <b>4.5%</b>, on every tap, always.</p>
+  <p><b>TUNNEL</b> is a knock-out: stay inside the walls, multiplier climbs the survival curve, cash out
+  any time. Touch a wall and it's gone.</p>
+  <p><b>Fair play, receipts included.</b> Tap any live bet for its receipt: quoted probability, fair vs
+  offered multiple, the exact oracle print at settlement. Production settles non-custodially on-chain
+  against signed oracle data — the house <i>cannot</i> touch payouts.</p>
+  <p style="color:var(--faint); font-size:10.5px;">Demo: play-money USDT, live public exchange feeds when
+  reachable (sim fallback). Not available to US persons in production. 18+.</p>
+  <div class="cta"><button id="modalClose">TAP IN</button></div>
+</div></div>
+
+<script>
+'use strict';
+/* ============================================================================
+   BLIP v2 — crypto underlyings, mock USDT vault, live feeds w/ sim fallback.
+   Same verified engine as v1 (quadrature touch-prob + BGK correction).
+   ========================================================================== */
+const cv=document.getElementById('cv'), cx=cv.getContext('2d');
+let W=0,H=0,DPR=1;
+function resize(){ DPR=devicePixelRatio||1; W=innerWidth; H=innerHeight;
+  cv.width=W*DPR; cv.height=H*DPR; cv.style.width=W+'px'; cv.style.height=H+'px';
+  cx.setTransform(DPR,0,0,DPR,0,0);}
+addEventListener('resize',resize); resize();
+
+/* ---------- math (verified v1 engine) ---------- */
+function erf(x){const s=x<0?-1:1;x=Math.abs(x);const t=1/(1+0.3275911*x);
+  const y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-x*x);
+  return s*y;}
+const ncdf=x=>0.5*(1+erf(x/Math.SQRT2));
+const MON=0.1;
+function startWindowProb(x,sigma,dur,a,b){
+  if(x>=a&&x<=b) return 1;
+  const c=Math.min(0.35*sigma,0.5826*sigma*Math.sqrt(MON));
+  const a2=a+c,b2=b-c;
+  const sd=sigma*Math.sqrt(Math.max(dur,1e-9));
+  const d=x>b2?x-b2:a2-x;
+  return Math.min(1,2*ncdf(-Math.max(d,0)/sd));
+}
+function touchProb(S,sigma,T1,T2,a,b){
+  if(T2<=0) return 0;
+  T1=Math.max(T1,0);
+  const dur=T2-T1;
+  if(T1<1e-9) return Math.min(0.9999,Math.max(1e-4,startWindowProb(S,sigma,dur,a,b)));
+  const sd1=sigma*Math.sqrt(T1); let p=0,ws=0;
+  for(let i=0;i<41;i++){const z=-4+8*i/40, w=Math.exp(-0.5*z*z);
+    ws+=w; p+=w*startWindowProb(S+sd1*z,sigma,dur,a,b);}
+  return Math.min(0.9999,Math.max(1e-4,p/ws));
+}
+function survivalCurve(sigma,Hh,maxT,dtS){
+  const M=81,h=2*Hh/(M-1);
+  let d=new Array(M).fill(0); d[(M-1)/2]=1;
+  const sd=sigma*Math.sqrt(dtS), span=Math.max(1,Math.ceil(4*sd/h));
+  const K=[]; let ks=0;
+  for(let k=-span;k<=span;k++){const v=Math.exp(-0.5*Math.pow(k*h/sd,2)); K.push(v); ks+=v;}
+  for(let i=0;i<K.length;i++)K[i]/=ks;
+  const steps=Math.ceil(maxT/dtS), surv=[1];
+  for(let s=1;s<=steps;s++){const nd=new Array(M).fill(0);
+    for(let j=0;j<M;j++){const dj=d[j]; if(dj<1e-12)continue;
+      for(let k=-span;k<=span;k++){const i=j+k; if(i>=0&&i<M)nd[i]+=dj*K[k+span];}}
+    d=nd; surv.push(d.reduce((x,y)=>x+y,0));}
+  return {surv,dtS};
+}
+
+/* ---------- assets & feeds ---------- */
+const ASSETS={
+  BTC:{sym:'btcusdt', okx:'BTC-USDT', p0:118500, ann:0.40, dec:1},
+  ETH:{sym:'ethusdt', okx:'ETH-USDT', p0:4420,   ann:0.55, dec:2},
+  SOL:{sym:'solusdt', okx:'SOL-USDT', p0:214,    ann:0.75, dec:3},
+};
+const NICE=[0.01,0.02,0.05,0.1,0.2,0.5,1,2,5,10,20,25,50,100,200,500];
+function niceStep(x){for(const n of NICE) if(n>=x) return n; return 1000;}
+function sigPS(a){return ASSETS[a].p0*ASSETS[a].ann/5615;} /* per-sqrt-second, from annualized */
+
+const CFG={colSec:5, futureSec:50, pastSec:55, edge:0.045, corrEdge:0.04,
+  lockout:0.8, maxMult:99, tickMs:100, repriceMs:400};
+
+let feed={mode:'sim', ws:null, lastPrice:null, lastMsg:0};
+function setBadge(){
+  const b=document.getElementById('feedbadge');
+  if(feed.mode==='live'){b.textContent='LIVE · '+feed.src; b.className='live';}
+  else {b.textContent='SIM FEED'; b.className='';}
+}
+function connectFeed(asset){
+  if(feed.ws){try{feed.ws.close();}catch(e){} feed.ws=null;}
+  feed.mode='sim'; setBadge();
+  const tryBinance=()=>{
+    try{
+      const ws=new WebSocket('wss://stream.binance.com:9443/ws/'+ASSETS[asset].sym+'@trade');
+      const to=setTimeout(()=>{try{ws.close();}catch(e){} tryOKX();},4000);
+      ws.onmessage=e=>{clearTimeout(to);
+        const d=JSON.parse(e.data); const p=parseFloat(d.p);
+        if(p>0){feed.mode='live'; feed.src='BINANCE'; feed.lastPrice=p; feed.lastMsg=Date.now(); setBadge();}};
+      ws.onerror=()=>{clearTimeout(to); tryOKX();};
+      feed.ws=ws;
+    }catch(e){tryOKX();}
+  };
+  const tryOKX=()=>{
+    if(feed.mode==='live')return;
+    try{
+      const ws=new WebSocket('wss://ws.okx.com:8443/ws/v5/public');
+      const to=setTimeout(()=>{try{ws.close();}catch(e){}},4000);
+      ws.onopen=()=>ws.send(JSON.stringify({op:'subscribe',args:[{channel:'trades',instId:ASSETS[asset].okx}]}));
+      ws.onmessage=e=>{const d=JSON.parse(e.data);
+        if(d.data&&d.data[0]&&d.data[0].px){clearTimeout(to);
+          feed.mode='live'; feed.src='OKX'; feed.lastPrice=parseFloat(d.data[0].px);
+          feed.lastMsg=Date.now(); setBadge();}};
+      feed.ws=ws;
+    }catch(e){}
+  };
+  tryBinance();
+}
+
+/* ---------- state ---------- */
+const st={asset:'BTC', now:0, price:ASSETS.BTC.p0, prev:ASSETS.BTC.p0, hist:[],
+  ewVar:sigPS('BTC')**2, sigma:sigPS('BTC'), rowPts:niceStep(sigPS('BTC')*2.2),
+  bal:1000, pnl:0, stake:1, mode:'grid', bets:[], corridor:null,
+  camY:ASSETS.BTC.p0, cells:new Map(), hover:null, house:250000, simLv:0};
+
+function switchAsset(a){
+  st.asset=a; st.price=st.prev=st.camY=feed.lastPrice||ASSETS[a].p0;
+  st.hist=[]; st.bets=[]; st.corridor=null; endCorridor();
+  st.ewVar=sigPS(a)**2; st.sigma=sigPS(a); st.rowPts=niceStep(sigPS(a)*2.2);
+  st.cells=new Map(); connectFeed(a); warm();
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.a===a));
+}
+
+/* ---------- engine tick ---------- */
+function simTick(dt){
+  st.simLv+=0.05*(0-st.simLv)*dt+0.28*Math.sqrt(dt)*gauss();
+  st.simLv=Math.max(-0.7,Math.min(0.9,st.simLv));
+  const sig=sigPS(st.asset)*Math.exp(st.simLv);
+  let p=st.price+sig*Math.sqrt(dt)*gauss();
+  if(Math.random()<dt/35) p+=(Math.random()<0.5?-1:1)*sig*(4+Math.random()*8);
+  return p;
+}
+function gauss(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();
+  return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+
+setInterval(()=>{
+  const dt=CFG.tickMs/1000;
+  st.now+=dt; st.prev=st.price;
+  if(feed.mode==='live'&&feed.lastPrice&&Date.now()-feed.lastMsg<6000) st.price=feed.lastPrice;
+  else {if(feed.mode==='live'){feed.mode='sim';setBadge();} st.price=simTick(dt);}
+  st.hist.push({t:st.now,p:st.price});
+  const cutoff=st.now-CFG.pastSec-5;
+  while(st.hist.length&&st.hist[0].t<cutoff)st.hist.shift();
+  const r=st.price-st.prev, lam=Math.pow(0.5,dt/20);
+  st.ewVar=lam*st.ewVar+(1-lam)*(r*r/dt);
+  st.sigma=Math.max(sigPS(st.asset)*0.3,Math.sqrt(st.ewVar));
+  const target=niceStep(st.sigma*2.2);
+  if(target!==st.rowPts&&(target>st.rowPts*1.9||target<st.rowPts*0.55)) st.rowPts=target;
+  settle(); corridorTick();
+},CFG.tickMs);
+
+/* ---------- grid pricing ---------- */
+const offered=p=>Math.max(1.01,Math.min(CFG.maxMult,(1-CFG.edge)/p));
+function reprice(){
+  const cells=new Map(), c0=Math.ceil(st.now/CFG.colSec);
+  const kMid=Math.round(st.camY/st.rowPts), rows=Math.ceil(H/2/rowPx())+2;
+  for(let j=0;j<CFG.futureSec/CFG.colSec;j++){
+    const t1=(c0+j)*CFG.colSec, t2=t1+CFG.colSec;
+    if(t2-st.now<=0.3)continue;
+    for(let k=kMid-rows;k<=kMid+rows;k++){
+      const a=k*st.rowPts, b=a+st.rowPts;
+      const p=touchProb(st.price,st.sigma,t1-st.now,t2-st.now,a,b);
+      cells.set(t1+':'+k,{t1,t2,a,b,p,mult:offered(p)});
+    }}
+  st.cells=cells;
+}
+setInterval(reprice,CFG.repriceMs);
+
+/* ---------- bets ---------- */
+function place(c){
+  if(st.bal<st.stake)return toast('INSUFFICIENT VAULT BALANCE','l');
+  if(c.t1-st.now<CFG.lockout)return toast('LOCKED · 0.8s ANTI-SNIPE WINDOW','l');
+  if(c.mult<=1.02||c.mult>=CFG.maxMult)return;
+  st.bal-=st.stake;
+  const bet={type:'cell',a:c.a,b:c.b,t1:c.t1,t2:c.t2,stake:st.stake,mult:c.mult,p:c.p,
+    sigmaAt:st.sigma,state:'open',id:Math.random().toString(36).slice(2,10)};
+  st.bets.push(bet);
+  if(st.bets.length===1)showReceipt(bet);
+}
+function settle(){
+  for(const b of st.bets){
+    if(b.state!=='open')continue;
+    if(st.now>=b.t1&&st.now<=b.t2&&st.price>=b.a&&st.price<=b.b){
+      b.state='won'; b.settledAt=st.now; b.settlePrice=st.price;
+      const pay=b.stake*b.mult; st.bal+=pay; st.pnl+=pay-b.stake; st.house-=pay-b.stake;
+      toast('HIT +'+pay.toFixed(2)+' USDT ('+b.mult.toFixed(2)+'x)','w');
+    } else if(st.now>b.t2){
+      b.state='lost'; b.settledAt=st.now; b.settlePrice=st.price;
+      st.pnl-=b.stake; st.house+=b.stake;
+      toast('MISS −'+b.stake.toFixed(2)+' USDT','l');
+    }}
+  st.bets=st.bets.filter(b=>b.state==='open'||st.now-b.settledAt<2.5);
+}
+
+/* ---------- tunnel (corridor) ---------- */
+function corrH(){return 2*st.rowPts;}
+function startCorridor(){
+  if(st.corridor)return;
+  if(st.bal<st.stake)return toast('INSUFFICIENT VAULT BALANCE','l');
+  st.bal-=st.stake;
+  const sc=survivalCurve(st.sigma,corrH(),90,MON);
+  st.corridor={t0:st.now,p0:st.price,lo:st.price-corrH(),hi:st.price+corrH(),
+    stake:st.stake,sc,mult:1};
+  document.getElementById('cashout').style.display='block';
+}
+function corridorTick(){
+  const c=st.corridor; if(!c)return;
+  if(st.price<=c.lo||st.price>=c.hi){
+    st.pnl-=c.stake; st.house+=c.stake; endCorridor();
+    toast('WALL HIT −'+c.stake.toFixed(2)+' USDT','l'); return;}
+  const el=st.now-c.t0, idx=Math.min(c.sc.surv.length-1,Math.floor(el/c.sc.dtS));
+  c.mult=Math.max(1,Math.min(500,(1-CFG.corrEdge)/Math.max(c.sc.surv[idx],1e-4)));
+  document.getElementById('coMult').textContent=c.mult.toFixed(2)+'x';
+}
+function cashOut(){
+  const c=st.corridor; if(!c)return;
+  const pay=c.stake*c.mult; st.bal+=pay; st.pnl+=pay-c.stake; st.house-=pay-c.stake;
+  toast('CASHED OUT +'+pay.toFixed(2)+' USDT ('+c.mult.toFixed(2)+'x)','w');
+  endCorridor();
+}
+function endCorridor(){st.corridor=null;
+  const el=document.getElementById('cashout'); if(el)el.style.display='none';}
+
+/* ---------- coords ---------- */
+const nowX=()=>W*0.40, pxPerSec=()=>(W-nowX())/CFG.futureSec;
+function rowPx(){return Math.min(52,Math.max(30,H/20));}
+const tToX=t=>nowX()+(t-st.now)*pxPerSec();
+const pToY=p=>H/2-(p-st.camY)/st.rowPts*rowPx();
+const yToP=y=>st.camY+(H/2-y)/rowPx()*st.rowPts;
+const dec=()=>ASSETS[st.asset].dec;
+
+/* ---------- render ---------- */
+function draw(){
+  requestAnimationFrame(draw);
+  st.camY+=(st.price-st.camY)*0.03;
+  cx.clearRect(0,0,W,H);
+  const g=cx.createRadialGradient(W*0.4,H*0.5,80,W*0.4,H*0.5,W*0.8);
+  g.addColorStop(0,'#0a0f0a'); g.addColorStop(1,'#070a08');
+  cx.fillStyle=g; cx.fillRect(0,0,W,H);
+  drawRows(); drawTunnel(); drawCells(); drawBets(); drawLine(); hud();
+}
+function drawRows(){
+  const rp=rowPx();
+  cx.strokeStyle='rgba(125,145,121,.07)'; cx.lineWidth=1;
+  const kTop=Math.floor(yToP(-rp)/st.rowPts), kBot=Math.ceil(yToP(H+rp)/st.rowPts);
+  for(let k=kBot;k<=kTop;k++){const y=pToY(k*st.rowPts);
+    cx.beginPath(); cx.moveTo(0,y); cx.lineTo(W,y); cx.stroke();
+    if(k%2===0){cx.fillStyle='rgba(125,145,121,.4)'; cx.font='9.5px ui-monospace,monospace';
+      cx.textAlign='right'; cx.fillText((k*st.rowPts).toFixed(dec()),W-10,y-5);}}
+  cx.fillStyle='rgba(125,145,121,.45)'; cx.font='9px ui-monospace,monospace'; cx.textAlign='center';
+  const c0=Math.ceil(st.now/CFG.colSec);
+  for(let j=0;j<=CFG.futureSec/CFG.colSec;j++){const t=(c0+j)*CFG.colSec, x=tToX(t);
+    if(x>nowX()&&x<W) cx.fillText('+'+Math.round(t-st.now)+'s',x,H-52);}
+}
+function drawCells(){
+  if(st.mode!=='grid')return;
+  cx.textAlign='center';
+  for(const[,c]of st.cells){
+    const x1=tToX(c.t1),x2=tToX(c.t2),yT=pToY(c.b),yB=pToY(c.a);
+    if(x2<nowX()+2||x1>W||yB<0||yT>H)continue;
+    const show=c.mult>1.05&&c.mult<CFG.maxMult;
+    if(!show)continue;
+    const locked=c.t1-st.now<CFG.lockout;
+    const hov=st.hover&&st.hover.t1===c.t1&&st.hover.a===c.a;
+    const cxm=(x1+x2)/2, cym=(yT+yB)/2;
+    const rw=Math.min(x2-x1-10,58), rh=Math.min(yB-yT-8,26);
+    if(hov&&!locked){
+      cx.fillStyle='rgba(182,255,46,.16)';
+      rr(x1+2,yT+2,x2-x1-4,yB-yT-4,10); cx.fill();
+      cx.strokeStyle='rgba(182,255,46,.8)'; cx.lineWidth=1.4;
+      rr(x1+2,yT+2,x2-x1-4,yB-yT-4,10); cx.stroke();
+    }
+    rr(cxm-rw/2,cym-rh/2,rw,rh,rh/2);
+    cx.fillStyle=locked?'rgba(72,88,74,.25)':(hov?'rgba(182,255,46,.9)':'rgba(31,44,28,.85)');
+    cx.fill();
+    cx.font='700 10.5px ui-monospace,monospace';
+    cx.fillStyle=locked?'rgba(72,88,74,.8)':(hov?'#0a0f06':'#a8c298');
+    cx.fillText(fmt(c.mult)+'x',cxm,cym+3.5);
+  }
+}
+function fmt(m){return m<10?m.toFixed(2):m.toFixed(1);}
+function drawBets(){
+  for(const b of st.bets){
+    const x1=Math.max(tToX(b.t1),nowX()),x2=tToX(b.t2),yT=pToY(b.b),yB=pToY(b.a);
+    const cxm=(x1+x2)/2,cym=(yT+yB)/2;
+    let fill='rgba(255,255,255,.95)', ink='#0a0d0a', glow=null;
+    if(b.state==='won'){fill='rgba(182,255,46,.95)'; ink='#0a0f06'; glow='rgba(182,255,46,.6)';}
+    if(b.state==='lost'){fill='rgba(255,93,93,.25)'; ink='#ffb3b3';}
+    if(glow){cx.shadowColor=glow; cx.shadowBlur=18;}
+    rr(cxm-34,cym-15,68,30,15); cx.fillStyle=fill; cx.fill(); cx.shadowBlur=0;
+    cx.textAlign='center'; cx.fillStyle=ink;
+    cx.font='800 11px ui-monospace,monospace';
+    cx.fillText(b.stake+'₮',cxm,cym-2);
+    cx.font='700 9px ui-monospace,monospace';
+    cx.fillText(fmt(b.mult)+'x',cxm,cym+10);
+  }
+}
+function rr(x,y,w,h,r){r=Math.min(r,h/2,w/2); cx.beginPath();
+  cx.moveTo(x+r,y); cx.arcTo(x+w,y,x+w,y+h,r); cx.arcTo(x+w,y+h,x,y+h,r);
+  cx.arcTo(x,y+h,x,y,r); cx.arcTo(x,y,x+w,y,r); cx.closePath();}
+function drawTunnel(){
+  const c=st.corridor; if(!c)return;
+  const x0=Math.max(0,tToX(c.t0)), yHi=pToY(c.hi), yLo=pToY(c.lo);
+  cx.fillStyle='rgba(143,216,255,.05)'; cx.fillRect(x0,yHi,W-x0,yLo-yHi);
+  cx.strokeStyle='rgba(143,216,255,.85)'; cx.lineWidth=2; cx.setLineDash([2,7]); cx.lineCap='round';
+  cx.beginPath(); cx.moveTo(x0,yHi); cx.lineTo(W,yHi); cx.stroke();
+  cx.beginPath(); cx.moveTo(x0,yLo); cx.lineTo(W,yLo); cx.stroke();
+  cx.setLineDash([]); cx.lineCap='butt';
+  cx.fillStyle='#8fd8ff'; cx.font='800 12px ui-monospace,monospace'; cx.textAlign='left';
+  cx.fillText(c.mult.toFixed(2)+'x',nowX()+12,pToY(st.price)-16);
+}
+function drawLine(){
+  if(st.hist.length<2)return;
+  const y0=pToY(st.price);
+  const grad=cx.createLinearGradient(0,0,nowX(),0);
+  grad.addColorStop(0,'rgba(182,255,46,0)'); grad.addColorStop(1,'rgba(182,255,46,.9)');
+  cx.lineWidth=2.2; cx.strokeStyle=grad; cx.lineJoin='round';
+  cx.shadowColor='rgba(182,255,46,.5)'; cx.shadowBlur=12;
+  cx.beginPath(); let started=false;
+  for(const h of st.hist){const x=tToX(h.t); if(x<-10)continue;
+    const y=pToY(h.p); if(!started){cx.moveTo(x,y);started=true;}else cx.lineTo(x,y);}
+  cx.stroke(); cx.shadowBlur=0;
+  cx.fillStyle='#b6ff2e'; cx.beginPath(); cx.arc(nowX(),y0,4,0,7); cx.fill();
+  cx.strokeStyle='rgba(182,255,46,.25)'; cx.beginPath(); cx.arc(nowX(),y0,9,0,7); cx.stroke();
+}
+function hud(){
+  const pv=document.getElementById('px');
+  pv.textContent='$'+st.price.toLocaleString(undefined,{minimumFractionDigits:dec(),maximumFractionDigits:dec()});
+  pv.className=st.price>=st.prev?'up':'dn';
+  document.getElementById('volv').textContent=(st.sigma*5615/ASSETS[st.asset].p0*100).toFixed(0)+'%';
+  document.getElementById('balv').textContent=st.bal.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+  const pe=document.getElementById('pnlv');
+  pe.textContent=(st.pnl>=0?'+':'−')+Math.abs(st.pnl).toFixed(2);
+  pe.style.color=st.pnl>=0?'var(--lime)':'var(--coral)';
+  document.getElementById('vBal').textContent=st.bal.toFixed(2)+' USDT';
+  const inPlay=st.bets.filter(b=>b.state==='open').reduce((s,b)=>s+b.stake,0)+(st.corridor?st.corridor.stake:0);
+  document.getElementById('vPlay').textContent=inPlay.toFixed(2)+' USDT';
+  document.getElementById('vHouse').textContent=Math.round(st.house).toLocaleString()+' USDT';
+  let delta=0;
+  for(const b of st.bets){if(b.state!=='open')continue;
+    delta+=b.stake*b.mult*Math.sign((b.a+b.b)/2-st.price);}
+  document.getElementById('vDelta').textContent=
+    Math.abs(delta)<1?'flat':(delta>0?'−':'+')+Math.abs(delta).toFixed(0)+'₮/band';
+}
+requestAnimationFrame(draw);
+
+/* ---------- receipt ---------- */
+function showReceipt(b){
+  const el=document.getElementById('receipt');
+  document.getElementById('rcTitle').textContent='RECEIPT · '+b.id.toUpperCase();
+  const rows=[
+    ['Structure','Range one-touch'],
+    ['Band','$'+b.a.toFixed(dec())+' – $'+b.b.toFixed(dec())],
+    ['Window','+'+Math.max(0,b.t1-st.now).toFixed(0)+'s → +'+Math.max(0,b.t2-st.now).toFixed(0)+'s'],
+    ['Implied prob',(b.p*100).toFixed(2)+'%'],
+    ['Fair multiple',(1/b.p).toFixed(2)+'x'],
+    ['Offered',b.mult.toFixed(2)+'x'],
+    ['Disclosed edge',((1-b.mult*b.p)*100).toFixed(1)+'%'],
+    ['Status',b.state.toUpperCase()+(b.settlePrice?' @ $'+b.settlePrice.toFixed(dec()):'')],
+  ];
+  document.getElementById('rcRows').innerHTML=
+    rows.map(r=>'<div class="row"><span class="k">'+r[0]+'</span><span class="v">'+r[1]+'</span></div>').join('');
+  document.getElementById('rcNote').innerHTML=
+    'Production receipt carries the <b>signed oracle attestation</b> (price, timestamp, feed ID) this bet '+
+    'settles against, verifiable on-chain. Edge is fixed at 4.5% — the house wins on velocity, never on payout games.';
+  el.style.display='block';
+}
+
+/* ---------- input ---------- */
+cv.addEventListener('mousemove',e=>{
+  st.hover=null;
+  if(st.mode!=='grid')return;
+  const t=st.now+(e.clientX-nowX())/pxPerSec();
+  if(t<=st.now)return;
+  const t1=Math.floor(t/CFG.colSec)*CFG.colSec;
+  const k=Math.floor(yToP(e.clientY)/st.rowPts);
+  const c=st.cells.get(t1+':'+k);
+  if(c)st.hover=c;
+});
+cv.addEventListener('click',e=>{
+  if(st.mode==='grid'){
+    for(const b of st.bets){
+      if(b.state!=='open')continue;
+      const x1=tToX(b.t1),x2=tToX(b.t2),yT=pToY(b.b),yB=pToY(b.a);
+      if(e.clientX>=x1&&e.clientX<=x2&&e.clientY>=yT&&e.clientY<=yB){showReceipt(b);return;}}
+    if(st.hover)place(st.hover);
+  } else if(st.mode==='corr'&&!st.corridor) startCorridor();
+});
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>switchAsset(t.dataset.a));
+document.querySelectorAll('.chip').forEach(ch=>ch.onclick=()=>{
+  document.querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));
+  ch.classList.add('on'); st.stake=+ch.dataset.s;});
+document.getElementById('mGrid').onclick=()=>setMode('grid');
+document.getElementById('mCorr').onclick=()=>setMode('corr');
+function setMode(m){st.mode=m;
+  document.getElementById('mGrid').classList.toggle('on',m==='grid');
+  document.getElementById('mCorr').classList.toggle('on',m==='corr');}
+document.getElementById('cashout').onclick=cashOut;
+addEventListener('keydown',e=>{if(e.code==='Space'&&st.corridor){e.preventDefault();cashOut();}});
+document.getElementById('vaultbtn').onclick=()=>{
+  const v=document.getElementById('vault'); v.style.display=v.style.display==='block'?'none':'block';};
+document.getElementById('fairBtn').onclick=()=>document.getElementById('modal').style.display='flex';
+document.getElementById('modalClose').onclick=()=>document.getElementById('modal').style.display='none';
+document.querySelectorAll('.panel .x').forEach(x=>x.onclick=()=>
+  document.getElementById(x.dataset.x).style.display='none');
+document.getElementById('depBtn').onclick=()=>{st.bal+=500; toast('DEPOSITED 500 USDT (MOCK)','w');};
+document.getElementById('wdBtn').onclick=()=>{
+  toast('WITHDREW '+st.bal.toFixed(2)+' USDT (MOCK)','w'); st.bal=0;};
+
+function toast(msg,cls){
+  const t=document.createElement('div'); t.className='toast '+cls; t.textContent=msg;
+  document.getElementById('toasts').appendChild(t);
+  setTimeout(()=>t.remove(),2400);
+}
+
+/* ---------- boot ---------- */
+function warm(){
+  for(let i=0;i<600;i++){st.now+=0.1; st.price=simTick(0.1); st.hist.push({t:st.now,p:st.price});}
+  st.camY=st.price; st.prev=st.price; reprice();
+}
+connectFeed('BTC'); warm();
+setTimeout(()=>document.getElementById('modal').style.display='flex',600);
+</script>
+</body>
+</html>
