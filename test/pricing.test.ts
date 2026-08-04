@@ -89,9 +89,9 @@ describe("offered", () => {
     expect(offered(0.1)).toBeCloseTo(9.55, 2);
   });
 
-  it("clamps to [1.01, 99]", () => {
+  it("clamps to [1.01, 12]", () => {
     expect(offered(0.99)).toBe(1.01);
-    expect(offered(0.001)).toBe(99);
+    expect(offered(0.001)).toBe(12);
   });
 });
 
@@ -99,31 +99,30 @@ describe("realized dealer edge simulation", () => {
   it("realized edge is positive and near quoted 4.5%", () => {
     const edge = 0.045;
     let totalStake = 0;
-    let totalPayout = 0;
+    let expectedPayout = 0;
     let playable = 0;
 
     // Offset bands away from spot so touch probs land in the playable mult range.
     for (let i = 0; i < 5000; i++) {
       const S = 100;
-      const sigma = 0.35 + Math.random() * 0.3;
-      const offset = 1 + Math.floor(Math.random() * 4); // 1..4 pts above spot
-      const width = 1 + Math.floor(Math.random() * 2); // 1..2 pt band
+      const sigma = 0.35 + (i % 30) * 0.01;
+      const offset = 1 + (i % 4);
+      const width = 1 + (i % 2);
       const a = S + offset;
       const b = a + width;
       const p = touchProb(S, sigma, 0, 5, a, b);
       const mult = offered(p, edge);
-      if (mult <= 1.02 || mult >= 99) continue;
+      if (mult <= 1.02 || mult >= 12) continue;
       playable++;
       const stake = 1;
       totalStake += stake;
-      const hit = Math.random() < p;
-      if (hit) totalPayout += stake * mult;
+      // E[payout] = stake * mult * p — avoids Bernoulli noise in CI
+      expectedPayout += stake * mult * p;
     }
 
     expect(playable).toBeGreaterThan(1000);
-    const realizedEdge = 1 - totalPayout / totalStake;
-    // Bernoulli draws around fair p; with edge baked into mult, dealer edge ~4.5% ± noise
-    expect(realizedEdge).toBeGreaterThan(0.01);
-    expect(realizedEdge).toBeLessThan(0.08);
+    const realizedEdge = 1 - expectedPayout / totalStake;
+    expect(realizedEdge).toBeGreaterThan(0.03);
+    expect(realizedEdge).toBeLessThan(0.06);
   });
 });

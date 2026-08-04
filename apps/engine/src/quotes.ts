@@ -26,6 +26,8 @@ export function buildGridCells(
       const b = a + rowPts;
       const p = touchProb(price, sigma, t1 - now, t2 - now, a, b);
       const mult = offered(p, CFG.edge, CFG.maxMult);
+      // Skip saturated longshots (would clamp to maxMult) and near-certain chips
+      if (mult <= 1.05 || mult >= CFG.maxMult) continue;
       cells.push({
         key: `${t1}:${k}`,
         t1,

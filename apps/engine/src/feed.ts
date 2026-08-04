@@ -143,5 +143,33 @@ export function updateEwmaVol(
 }
 
 export function isFeedStale(feed: FeedState): boolean {
-  return feed.mode === "live" && Date.now() - feed.lastMsg > 8000;
+  return Date.now() - feed.lastMsg > 8000;
+}
+
+/** US equities RTH: Mon–Fri 09:30–16:00 America/New_York (no holiday calendar). */
+export function isUsRthOpen(now = new Date()): boolean {
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+  const parts = Object.fromEntries(fmt.formatToParts(now).map((p) => [p.type, p.value]));
+  const wd = parts.weekday;
+  if (wd === "Sat" || wd === "Sun") return false;
+  const mins = Number(parts.hour) * 60 + Number(parts.minute);
+  return mins >= 9 * 60 + 30 && mins < 16 * 60;
+}
+
+/**
+ * Quiet after-hours drift around the last exchange print so the tape stays
+ * playable when SPY/QQQ/AAPL are closed (unlike 24/7 crypto).
+ */
+export function afterHoursTick(feed: FeedState, asset: Asset, price: number, anchor: number, dt: number): number {
+  let p = simTick(feed, asset, price, dt);
+  // Mean-revert toward last close so we don't wander off into fantasy land
+  p += (anchor - p) * Math.min(1, 0.015 * dt * 10);
+  const maxDev = Math.max(anchor * 0.004, ASSETS[asset].p0 * 0.002);
+  return Math.max(anchor - maxDev, Math.min(anchor + maxDev, p));
 }

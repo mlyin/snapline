@@ -29,7 +29,8 @@ export const CFG = {
   edge: 0.045,
   corrEdge: 0.04,
   lockout: 0.8,
-  maxMult: 99,
+  /** Hide / reject cell bubbles at or above this — far OTM longshots (90x+) are noise */
+  maxMult: 12,
   tickMs: 100,
   repriceMs: 400,
   commitDelayMs: 150,

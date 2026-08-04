@@ -101,7 +101,7 @@ export function survivalCurve(
   return { surv, dtS };
 }
 
-export function offered(p: number, edge = 0.045, maxMult = 99): number {
+export function offered(p: number, edge = 0.045, maxMult = 12): number {
   return Math.max(1.01, Math.min(maxMult, (1 - edge) / p));
 }
 
