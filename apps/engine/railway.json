@@ -7,7 +7,7 @@
   "deploy": {
     "startCommand": "node /app/apps/engine/dist/index.js",
     "healthcheckPath": "/health",
-    "healthcheckTimeout": 30,
+    "healthcheckTimeout": 100,
     "restartPolicyType": "ON_FAILURE"
   }
 }

@@ -552,10 +552,9 @@ async function main(): Promise<void> {
     return reply.code(200).type("text/plain").send("ok");
   });
 
-  // Kick off DB init without blocking the HTTP listener (Railway healthcheck)
+  // Kick off DB init without blocking listen
   const ledgerReady = ledger.ensureReady().catch((err) => {
-    console.error("[ledger] init failed", err);
-    throw err;
+    console.error("[ledger] init failed — continuing with in-memory cache", err);
   });
 
   await app.register(cors, { origin: true });
@@ -599,9 +598,17 @@ async function main(): Promise<void> {
 
   setInterval(() => reprice(), CFG.repriceMs);
 
+  console.log(
+    JSON.stringify({
+      msg: "snapline-listen",
+      host: HOST,
+      port: PORT,
+      hasDatabaseUrl: Boolean(process.env.DATABASE_URL),
+      node: process.version,
+    }),
+  );
   await app.listen({ port: PORT, host: HOST });
   console.log(`SNAPLINE engine listening on http://${HOST}:${PORT} (health /health)`);
-
   await ledgerReady;
   console.log("[ledger] ready");
 }

@@ -9,19 +9,25 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY packages/shared/package.json ./packages/shared/
 COPY apps/engine/package.json ./apps/engine/
 
-# Install engine + workspace deps only (skips Next/Privy web tree)
 RUN pnpm install --frozen-lockfile=false --filter @snapline/engine...
+
+# Bump CACHEBUST whenever health/listen changes so Railway cannot reuse a stale engine layer
+ARG CACHEBUST=health-2026-08-04-c
+RUN echo "cachebust=$CACHEBUST"
 
 COPY packages/shared ./packages/shared
 COPY apps/engine ./apps/engine
 
 RUN pnpm --filter @snapline/shared build \
- && pnpm --filter @snapline/engine build
+ && pnpm --filter @snapline/engine build \
+ && test -f /app/apps/engine/dist/index.js \
+ && node -e "console.log('engine entry ok', require('fs').statSync('/app/apps/engine/dist/index.js').size)"
 
-WORKDIR /app/apps/engine
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 EXPOSE 8080
 
-# Absolute path so Railway startCommand / cwd cannot miss dist/
+WORKDIR /app/apps/engine
+
+# Absolute path — independent of Railway start cwd
 CMD ["node", "/app/apps/engine/dist/index.js"]
