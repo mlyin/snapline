@@ -19,7 +19,7 @@ export function Providers({ children }: { children: ReactNode }) {
         appearance: {
           theme: "dark",
           accentColor: "#b6ff2e",
-          logo: "https://playsnapline.com/favicon.ico",
+          // No remote logo — Privy header text is enough; avoids broken image on login
           walletChainType: "solana-only",
           landingHeader: "SNAPLINE",
           loginMessage: "Tap the tape",
